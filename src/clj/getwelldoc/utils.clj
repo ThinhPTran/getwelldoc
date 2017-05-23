@@ -12,5 +12,10 @@
   []  
   "0.1.0")
 
-
+(defn tao2-version
+  "retrieves the TAO2 version declared in project.clj"
+  []
+  ;; In debug, obtain with environ
+  ;; In release (ubjerjar), obtain from project properties
+  (get-version))
 
