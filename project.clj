@@ -4,6 +4,7 @@
                  [org.clojure/clojurescript "1.9.229"]
                  [funcool/clojure.jdbc "0.9.0"]
                  [org.firebirdsql.jdbc/jaybird-jdk18 "2.2.10"]
+                 [clj-time "0.12.0"]
                  [honeysql "0.8.0"]
                  [reagent "0.6.1"]
                  [environ "1.1.0"]]

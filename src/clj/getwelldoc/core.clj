@@ -21,5 +21,6 @@
   (pp/pprint (config/get-data-sources @config/tao2-cfg))
   (println "All wells: ")
   (pp/pprint (dbcore/get-matching-wells :pioneer {:select-set #{:field :lease :well :cmpl}
-                                                  :where-map {}})))
+                                                  :where-map {}}))
+  (println "Pick a well: "))
 
