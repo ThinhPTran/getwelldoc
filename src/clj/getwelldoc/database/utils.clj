@@ -1,4 +1,4 @@
-(ns getwelldoc.dbutils
+(ns getwelldoc.database.utils
   (:require [getwelldoc.config :as config]
             [clj-time.coerce :as time-coerce]
             [clj-time.core :as time-core]
@@ -121,3 +121,40 @@
   (let [sqltext (sql/format qry)
         _ (comment (prn sqltext))]
     (jdbc/fetch dbc sqltext)))
+
+(defn- vector-slice
+  "given array of similarly keyed maps, yield a vector of all elements
+  in the maps with key 'kw'"
+  [kw mapvec]
+  (into [] (map #(kw %) mapvec)))
+
+(defn vector-slices
+  "given array of similarly keyed maps, yield all the vector slices
+  in the map by looking at the first element's keys"
+  [v]
+  (let [kys (keys (first v))]
+    (into {} (map #(identity [% (vector-slice % v)]) kys))))
+
+(defn reform-as-table
+  "reform an array of homogenous maps  [ {:col [val ...] }] into table form
+   {:cols=[] :vals=[]}.  kwds is vector of keywords from the query
+   to be included, rset is the query results"
+  [kwds rset]
+  (let [ncols  (count kwds)
+        nrows  (count ((first kwds) rset))
+        cols   (into [] (map (fn [ix] {:name (name (get kwds ix))}))
+                     (range ncols))
+        parts  (partition ncols
+                          (for [ix (range nrows) ky kwds]
+                            (get (ky rset) ix)))
+        vals   (into [] (map (fn [r] (into [] r)) parts))]
+    {:cols cols :vals vals}))
+
+(defn reform-inverted-data
+  "Corrects a data inversion problem with valves-models-list"
+  [vm]
+  (into [] (for [vcnt (range (count (:status-list (first vm))))]
+             (let [vmap (into {} (for [k (keys (first vm))]
+                                   {k (into [] (for [idx (range (count vm))]
+                                                 (nth (k (nth vm idx)) vcnt)))}))]
+               vmap))))
