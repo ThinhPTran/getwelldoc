@@ -3,134 +3,45 @@
   (:require [getwelldoc.config :as config]
             [getwelldoc.utils :as utils]
             [getwelldoc.database.core :as dbcore]
+            [getwelldoc.common :as com]
             [getwelldoc.mimerefs :as mref :refer [str->ref realize-refstr]]
+            [getwelldoc.system :as sys]
+            [org.httpkit.server :as server]
+            [ring.util.response :as response]
+            [compojure.core :as compcore :refer [defroutes GET POST]]
+            [compojure.route :as route]
+            [compojure.handler :as handler]
             [clojure.pprint :as pp]
+            [clojure.tools.logging :as log]
             [environ.core :refer [env]]))
 
-(def app-state (atom {}))
+(defroutes app-routes
+           (GET "/" [] (response/resource-response "public/index.html"))
+           (GET  "/channel" req (sys/ring-ws-handoff req))
+           (POST "/channel" req (sys/ring-ws-post req))
+           (route/resources "/")
+           (route/not-found "404! :("))
+
+(defn- wrap-request-logging [handler]
+  (fn [{:keys [request-method uri] :as req}]
+    (let [resp (handler req)]
+      (log/info (name request-method) (:status resp)
+                (if-let [qs (:query-string req)]
+                  (str uri "?" qs) uri))
+      resp)))
+
+(def app
+  (-> app-routes
+      (handler/site)
+      (wrap-request-logging)))
 
 (defn -main [& args]
-  (time
-    (do
-      (println (format "===================================\nTao2 Version : %s\n===================================\n" (utils/tao2-version)))
-      (config/load-config!)
-      (println "tao2-cfg:")
-      (pp/pprint @config/tao2-cfg)
-      (println "source revs: ")
-      (pp/pprint (dbcore/get-data-source-revs))
-      (println "config: ")
-      (config/set-db-connections (dbcore/get-data-source-revs))
-      (pp/pprint @config/tao2-cfg)
-      (println "datasources: ")
-      (swap! app-state assoc :dsn (config/get-data-sources @config/tao2-cfg))
-      (pp/pprint (:dsn @app-state))
-      (println "All wells: ")
-      (println "dsn: " (first (keys (:dsn @app-state))))
-      (swap! app-state assoc :all-well (->> (dbcore/get-matching-wells (first (keys (:dsn @app-state))) {:select-set #{:field :lease :well :cmpl}
-                                                                                                         :where-map {}})
-                                            (vec)
-                                            (map vec)
-                                            (map #(zipmap [:field :lease :well :cmpl] %))))
-      (swap! app-state assoc :current-well (first (:all-well @app-state)))
-      (pp/pprint (:all-well @app-state))
-      (println "Pick a well: ")
-      (pp/pprint (:current-well @app-state))
-      (swap! app-state assoc :welldoc (dbcore/get-well {:dsn :pioneer
-                                                        :field (:field (:current-well @app-state))
-                                                        :lease (:lease (:current-well @app-state))
-                                                        :well (:well (:current-well @app-state))
-                                                        :cmpl (:cmpl (:current-well @app-state))}))
-      (pp/pprint @app-state)
-      (println "Get :well-mstr-map")
-      (swap! app-state assoc-in [:welldoc :well-mstr-map] (realize-refstr (:well-mstr-map (:welldoc @app-state))))
-      ;(pp/pprint (:welldoc @app-state))
-      (println "Get :modl-ctrl-map")
-      (swap! app-state assoc-in [:welldoc :modl-ctrl-map] (realize-refstr (:modl-ctrl-map (:welldoc @app-state))))
-      ;(pp/pprint (:welldoc @app-state))
-      (println "Get :lgas-props-map")
-      (swap! app-state assoc-in [:welldoc :lgas-props-map] (realize-refstr (:lgas-props-map (:welldoc @app-state))))
-      ;(pp/pprint (:welldoc @app-state))
-      (println "Get :rsvr-map")
-      (swap! app-state assoc-in [:welldoc :rsvr-map] (realize-refstr (:rsvr-map (:welldoc @app-state))))
-      ;(pp/pprint (:welldoc @app-state))
-      (println "Get :dsvy-map")
-      (swap! app-state assoc-in [:welldoc :dsvy-map] (realize-refstr (:dsvy-map (:welldoc @app-state))))
-      ;(pp/pprint (:welldoc @app-state))
-      (println "Get :flow-line-map")
-      (swap! app-state assoc-in [:welldoc :flow-line-map] (realize-refstr (:flow-line-map (:welldoc @app-state))))
-      ;(pp/pprint (:welldoc @app-state))
-      (println "Get :inj-mech-map")
-      (swap! app-state assoc-in [:welldoc :inj-mech-map] (realize-refstr (:inj-mech-map (:welldoc @app-state))))
-      ;(pp/pprint (:welldoc @app-state))
-      (println "Get :prod-mech-map")
-      (swap! app-state assoc-in [:welldoc :prod-mech-map] (realize-refstr (:prod-mech-map (:welldoc @app-state))))
-      ;(pp/pprint (:welldoc @app-state))
-      (println "Get :lgas-perf-settings-map ")
-      (swap! app-state assoc-in [:welldoc :lgas-perf-settings-map ] (realize-refstr (:lgas-perf-settings-map  (:welldoc @app-state))))
-      ;(pp/pprint (:welldoc @app-state))
-      (println "Get :alt-temps-map  ")
-      (swap! app-state assoc-in [:welldoc :alt-temps-map  ] (realize-refstr (:alt-temps-map   (:welldoc @app-state))))
-      ;(pp/pprint (:welldoc @app-state))
-      (println "Get :stored-lgas-response-map   ")
-      (swap! app-state assoc-in [:welldoc :stored-lgas-response-map] (realize-refstr (:stored-lgas-response-map (:welldoc @app-state))))
-      ;(pp/pprint (:welldoc @app-state))
-      (println "Get :welltest-map")
-      (swap! app-state assoc-in [:welldoc :welltest-map] (realize-refstr (:welltest-map (:welldoc @app-state))))
-      ;(pp/pprint (:welldoc @app-state))
-      (println "Get :flowing-gradient-survey-map")
-      (swap! app-state assoc-in [:welldoc :flowing-gradient-survey-map] (realize-refstr (:flowing-gradient-survey-map (:welldoc @app-state))))
-      ;(pp/pprint (:welldoc @app-state))
-      ;(println "Get :static-survey")
-      ;(swap! app-state assoc-in [:welldoc :static-survey] (realize-refstr (:static-survey (:welldoc @app-state))))
-      ;(pp/pprint (:welldoc @app-state)))))
-      ;(println "Get :buildup-survey")
-      ;(swap! app-state assoc-in [:welldoc :buildup-survey] (realize-refstr (:buildup-survey (:welldoc @app-state))))
-      ;(pp/pprint (:welldoc @app-state))
-      (println "Get :reservoir-survey")
-      (swap! app-state assoc-in [:welldoc :reservoir-survey] (realize-refstr (:reservoir-survey (:welldoc @app-state))))
-      ;(pp/pprint (:welldoc @app-state))
-      ;(println "Get :pvt-sample-map")
-      ;(swap! app-state assoc-in [:welldoc :pvt-sample-map] (realize-refstr (:pvt-sample-map (:welldoc @app-state))))
-      ;(pp/pprint (:welldoc @app-state))
-      (println "Get :scada-survey")
-      (swap! app-state assoc-in [:welldoc :scada-survey] (realize-refstr (:scada-survey (:welldoc @app-state))))
-      ;(pp/pprint (:welldoc @app-state))
-      (println "Get :mandrel-survey-map")
-      (swap! app-state assoc-in [:welldoc :mandrel-survey-map] (realize-refstr (:mandrel-survey-map (:welldoc @app-state))))
-      ;(pp/pprint (:welldoc @app-state))
-      ;(println "Get :welltracer-survey")
-      ;(swap! app-state assoc-in [:welldoc :welltracer-survey] (realize-refstr (:welltracer-survey (:welldoc @app-state))))
-      ;(pp/pprint (:welldoc @app-state))
-      (println "Get :welltest-hist-map ")
-      (swap! app-state assoc-in [:welldoc :welltest-hist-map (first (keys (:welltest-hist-map  (:welldoc @app-state))))] (realize-refstr (first (vals (:welltest-hist-map  (:welldoc @app-state))))))
-      ;(pp/pprint (:welldoc @app-state))
-      (println "Get :flowing-gradient-survey-hist-map ")
-      (swap! app-state assoc-in [:welldoc :flowing-gradient-survey-hist-map (first (keys (:flowing-gradient-survey-hist-map  (:welldoc @app-state))))] (realize-refstr (first (vals (:flowing-gradient-survey-hist-map  (:welldoc @app-state))))))
-      ;(pp/pprint (:welldoc @app-state))
-      ;(println "Get :static-survey-hist-map ")
-      ;(swap! app-state assoc-in [:welldoc :static-survey-hist-map (first (keys (:static-survey-hist-map  (:welldoc @app-state))))] (realize-refstr (first (vals (:static-survey-hist-map  (:welldoc @app-state))))))
-      ;(pp/pprint (:welldoc @app-state))
-      ;(println "Get :buildup-survey-hist-map ")
-      ;(swap! app-state assoc-in [:welldoc :buildup-survey-hist-map (first (keys (:buildup-survey-hist-map  (:welldoc @app-state))))] (realize-refstr (first (vals (:buildup-survey-hist-map  (:welldoc @app-state))))))
-      ;(pp/pprint (:welldoc @app-state))
-      (println "Get :reservoir-survey-hist-map  ")
-      (swap! app-state assoc-in [:welldoc :reservoir-survey-hist-map  (first (keys (:reservoir-survey-hist-map   (:welldoc @app-state))))] (realize-refstr (first (vals (:reservoir-survey-hist-map   (:welldoc @app-state))))))
-      ;(pp/pprint (:welldoc @app-state))
-      ;(println ":pvt-sample-hist-map  ")
-      ;(swap! app-state assoc-in [:welldoc :pvt-sample-hist-map  (first (keys (:pvt-sample-hist-map   (:welldoc @app-state))))] (realize-refstr (first (vals (:pvt-sample-hist-map   (:welldoc @app-state))))))
-      ;(pp/pprint (:welldoc @app-state))
-      (println "Get :scada-survey-hist-map ")
-      (swap! app-state assoc-in [:welldoc :scada-survey-hist-map  (first (keys (:scada-survey-hist-map   (:welldoc @app-state))))] (realize-refstr (first (vals (:scada-survey-hist-map   (:welldoc @app-state))))))
-      ;(pp/pprint (:welldoc @app-state))
-      (println "Get :mandrel-survey-hist-map ")
-      (swap! app-state assoc-in [:welldoc :mandrel-survey-hist-map  (first (keys (:mandrel-survey-hist-map   (:welldoc @app-state))))] (realize-refstr (first (vals (:mandrel-survey-hist-map   (:welldoc @app-state))))))
-      ;(pp/pprint (:welldoc @app-state))
-      ;(println "Get :welltracer-survey-hist-map ")
-      ;(swap! app-state assoc-in [:welldoc :welltracer-survey-hist-map  (first (keys (:welltracer-survey-hist-map   (:welldoc @app-state))))] (realize-refstr (first (vals (:welltracer-survey-hist-map   (:welldoc @app-state))))))
-      ;(pp/pprint (:welldoc @app-state))
-      ;(println "Get :outflow-map  ")
-      ;(swap! app-state assoc-in [:welldoc :outflow-map  ] (realize-refstr (:outflow-map   (:welldoc @app-state))))
-      (pp/pprint (:welldoc @app-state)))))
+  (sys/ws-message-router)
+  (time (server/run-server app {:port 3000}))
+  (time (com/initinfo))
+  (pp/pprint (:welldoc @com/app-state))
+  (time (com/get-well-mstr-map))
+  (time (com/get-modl-ctrl-map)))
 
 
 

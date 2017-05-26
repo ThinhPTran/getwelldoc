@@ -7,6 +7,11 @@
                  [clj-time "0.12.0"]
                  [honeysql "0.8.0"]
                  [reagent "0.6.1"]
+                 [http-kit "2.1.18"]
+                 [ring "1.2.2"]
+                 [compojure "1.1.8"]
+                 [org.clojure/tools.logging "0.2.6"]
+                 [com.taoensso/sente "0.14.0"]
                  [environ "1.1.0"]]
   
   :min-lein-version "2.5.3"

@@ -1,8 +1,6 @@
 (ns getwelldoc.core
-  (:require
-   [reagent.core :as reagent]
-   ))
-
+  (:require [getwelldoc.serverevents :as se]
+            [reagent.core :as reagent]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Vars
@@ -27,8 +25,8 @@
 (defn dev-setup []
   (when ^boolean js/goog.DEBUG
     (enable-console-print!)
-    (println "dev mode")
-    ))
+    (println "dev mode")))
+
 
 (defn reload []
   (reagent/render [page app-state]
