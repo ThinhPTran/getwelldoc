@@ -17,10 +17,11 @@
 
 (defroutes app-routes
            (GET "/" [] (response/resource-response "public/index.html"))
-           (GET  "/channel" req (sys/ring-ws-handoff req))
-           (POST "/channel" req (sys/ring-ws-post req))
+           (GET  "/chsk" req (sys/ring-ws-handoff req))
+           (POST "/chsk" req (sys/ring-ws-post req))
+           (POST "/login" req (sys/login-handler req))
            (route/resources "/")
-           (route/not-found "404! :("))
+           (route/not-found "<h1>Page not found</h1>"))
 
 (defn- wrap-request-logging [handler]
   (fn [{:keys [request-method uri] :as req}]
@@ -39,7 +40,6 @@
   (sys/ws-message-router)
   (time (server/run-server app {:port 3000}))
   (time (com/initinfo))
-  (pp/pprint (:welldoc @com/app-state))
   (time (com/get-well-mstr-map))
   (time (com/get-modl-ctrl-map)))
 
